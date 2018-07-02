@@ -1,37 +1,52 @@
 import requests
 import json
 import csv 
+import time
 
+# Need github token to make queries
+ghtoken = ""
+with open("gh.token", "r") as f:
+	reader = f.readlines()
+	ghtoken = reader[0]
 
 def main():
-	# Read all data from CSV source
-	pkg_data = read_pkg_csv("python_annotations.csv")
+	# Read packages from CSV file
+	packList = read_pkg_csv("Py_packages_toScrape.csv")
 	# Get all names from index 0 of each entry
-	pkg_names = [pkg["package"] for pkg in pkg_data]
+	pkg_names = [pkg for pkg in packList]
 	# GET request the text of each package's setup.py - raw github link
-	pkg_data = get_gh_file(pkg_data)
-	# We have all the setup.py texts, now look for crossovers
-	pkg_data = get_crossovers(pkg_names, pkg_data)
+	results = send_query(packList)
 	# Write out the results as csv file
-	write_csv(pkg_data)
+	write_csv(results)
 	return
 
+def read_pkg_csv(filename):
+	packList = []
+	with open(filename) as csvfile:
+		# Csv reader
+	    reader = csv.reader(csvfile, delimiter=",")
+	    for row in reader:
+	    	package = row[0]
+	    	if package != "package":
+	    		packList.append(package)
+	return packList
 
-def write_csv(pkg_data):
+
+def write_csv(results):
 	# The headers we want to write out
-	_headers = ["package", "repo", "setup", "connections", "other", "notes"]
+	_headers = ["package", "crossover_package", "crossover_file"]
 	# List to be written out
 	_writeout = []
 	# Reorder in a list so it's csv-write friendly
-	for pkg in pkg_data:
+	for line in results:
 		_tmp = []
 		for header in _headers:
 			try:
-				_tmp.append(pkg[header])
+				_tmp.append(line[header])
 			except KeyError:
 				_tmp.append(" ")
 		_writeout.append(_tmp)
-	with open("gitPyResults.csv", "w") as csvfile:
+	with open("scrapeGitResults.csv", "w") as csvfile:
 		writer = csv.writer(csvfile, delimiter=",")
 		writer.writerow(_headers)
 		for row in _writeout:
@@ -39,36 +54,36 @@ def write_csv(pkg_data):
 	return
 
 
-def get_crossovers(pkg_names, pkg_data):
-	for pkg in pkg_data:
-		pkg["connections"] = []
-		for pkg_name in pkg_names:
-			if pkg_name.lower() in pkg["text"].lower() and pkg_name.lower() != pkg["package"]:
-				pkg["connections"].append(pkg_name.lower())
-		pkg["connections"] = ", ".join(pkg["connections"])
-	return pkg_data
+def send_query(packList):
+	results = []
+
+	for pkg in packList:
+		print("Querying Github: {}".format(pkg))
+		try:
+
+			r = requests.get('https://api.github.com/search/code?q="import {}"+in:file+language:"python"+extension:"py"'.format(pkg), 
+				headers={"Authorization":"token 73ebf3ec3fa330cabbe6b1bc6facc2a115ee5e68", "Accept": "application/vnd.github.v3+json"})
+
+			if r.status_code == 200:
+				try:
+					r_text = json.loads(r.text)
+					for result in r_text["items"]:
+						try:
+							results.append({"package": pkg, "crossover_file": result["html_url"], "crossover_package": result["repository"]["name"]})
+						except KeyError:
+							print("Error parsing a result for: {}".format(pkg))
+				except Exception as e:
+					print("Missing data from Github response object for package: {}".format(pkg))
+			else:
+				print("Received error from Github API: Status Code: {}".format(r.status_code))
+
+			# Don't query github too fast. Take a break
+			time.sleep(10)
+		except Exception as e:
+			print("Unable to make Github request. Connection issues.")
 
 
-def read_pkg_csv(filename):
-	out = []
-	with open(filename) as csvfile:
-		# Csv reader
-	    reader = csv.DictReader(csvfile, delimiter=",")
-	    for row in reader:
-	    	out.append(row)
-	return out
-
-def get_gh_file(pkg_data):
-	for pkg in pkg_data:
-		# If the setup.py requirements are stored in a separate file, get that file instead
-		if pkg["other"]:
-			r = requests.get(pkg["other"])
-		# Normal case: Get the setup.py file
-		else:
-			r = requests.get(pkg["setup"])
-		pkg["text"] = r.text
-	return pkg_data
-
+	return results
 
 
 main()
