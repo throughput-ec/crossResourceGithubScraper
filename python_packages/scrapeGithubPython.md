@@ -1,15 +1,31 @@
-import requests
-import json
-import csv 
-import time
+---
+title: "scrapeGithubPython"
+author: Chris Heiser
+---
+### Overview
+In this case a user has written a script to link a data resource, and the Python package written for that resource, to resources in GitHub.  The intention here is to survey ways in which the data resource is being used in analytic workflows.
 
+We are looking for the statement "import <package_name>" in Python code found on Github. 
+
+
+
+First, link your valid Github token to the script. This authorizes you to make API calls. You can generate a token using your [developer settings](https://developer.github.com/v3/guides/basics-of-authentication/) in GitHub.
+
+```python
 # Option 1: Paste your github token to make Github API calls
 ghtoken = ""
 # Option 2: If you have your github token stored in a file, read it in from the file.
 with open("gh.token", "r") as f:
 	reader = f.readlines()
 	ghtoken = reader[0]
+```
 
+
+
+The "Py_packages_toScrape.csv" is a single column of python packages names. There isn't a Python equivalent to ROpenSci, so this list was manually created from popular scientific packages. 
+
+
+```python
 def main(ghtoken):
 	"""
 	Main function for the scraper. Read package list, query Github, write results.
@@ -22,58 +38,13 @@ def main(ghtoken):
 	# Write out the results to a csv file
 	write_csv(results)
 	return
+```
 
 
-def read_pkg_csv(filename):
-	"""
-	Open the CSV file and read in the package list. 
 
-	"""
-	packList = []
-	with open(filename) as csvfile:
-		# Csv reader
-	    reader = csv.reader(csvfile, delimiter=",")
-	    for row in reader:
-	    	package = row[0]
-	    	# Ignore the header row
-	    	if package != "package":
-	    		# Append individual package name
-	    		packList.append(package)
+We put together the API request and send it out with the authorized token. We use information from the response to write a CSV file with the relevant results. Each line in the "scrapeGitResults.csv" file represents a single connection between two packages, and the URL to the file where the "import <package_name>" was found. 
 
-	return packList
-
-
-def write_csv(results):
-	"""
-	Write out the results to a CSV file
-
-	"""
-
-	# The headers we want to write out
-	_headers = ["package", "crossover_package", "crossover_file"]
-
-	# List to be written out
-	_writeout = []
-
-	# Organize results into a csv-friendly writeable list
-	for line in results:
-		_tmp = []
-		for header in _headers:
-			try:
-				_tmp.append(line[header])
-			except KeyError:
-				_tmp.append(" ")
-		_writeout.append(_tmp)
-
-	# Write new (or overwrite) csv file with organized results
-	with open("scrapeGitResults.csv", "w") as csvfile:
-		writer = csv.writer(csvfile, delimiter=",")
-		writer.writerow(_headers)
-		for row in _writeout:
-			writer.writerow(row)
-	return
-
-
+```python
 def send_query(packList, ghtoken):
 
 	"""
@@ -119,49 +90,6 @@ def send_query(packList, ghtoken):
 			print("Unable to make Github request. Connection issues.")
 
 	return results
-
-
-main(ghtoken)
-
-
-# def write_multi_connection_csv():
-# 	"""
-# 	Do Not Use: Open the CSV file and read in the package list. 
-
-# 	"""
-# 	multi = {}
-# 	output = []
-# 	packList = []
-# 	_headers = ["package", "connections"]
-
-# 	# Read packages list from CSV file
-# 	original = read_pkg_csv("Py_packages_toScrape.csv")
-
-# 	with open("scrapeGitResults.csv") as csvfile:
-# 		# Csv reader
-# 	    reader = csv.DictReader(csvfile, delimiter=",")
-# 	    for row in reader:
-#     		# Append individual package name
-#     		packList.append(row)
-
-# 	for entry in packList:
-# 		if entry["package"] not in multi:
-# 			multi[entry["package"]] = []
-
-# 		# Conditions: The package must be in our packList, not equal to itself, and not already in the multiList. 
-# 		if entry["crossover_package"] not in multi[entry["package"]] and entry["crossover_package"] in original:
-# 			multi[entry["package"]].append(entry["crossover_package"])
-
-# 	for k,v in multi.items():
-# 		output.append([k, v])
-
-# 	# Write new (or overwrite) csv file with organized results
-# 	with open("scrapeGitResultsMulti.csv", "w") as csvfile:
-# 		writer = csv.writer(csvfile, delimiter=",")
-# 		writer.writerow(_headers)
-# 		for row in output:
-# 			writer.writerow(row)
-
-# 	return packList
+```
 
 
