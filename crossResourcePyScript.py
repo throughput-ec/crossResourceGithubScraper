@@ -1,12 +1,13 @@
 import requests
 import json
 import csv 
+import os
 import time
 
 # Option 1: Paste your github token to make Github API calls
 ghtoken = ""
 # Option 2: If you have your github token stored in a file, read it in from the file.
-with open("gh.token", "r") as f:
+with open(os.path.join("data", "import", "gh.token"), "r") as f:
 	reader = f.readlines()
 	ghtoken = reader[0]
 
@@ -16,7 +17,7 @@ def main(ghtoken):
 
 	"""
 	# Read packages list from CSV file
-	packList = read_pkg_csv("Py_packages_toScrape.csv")
+	packList = read_pkg_csv(os.path.join("data", "import", "packagesToScrape.csv"))
 	# Query Github with the package list
 	results = send_query(packList, ghtoken)
 	# Write out the results to a csv file
