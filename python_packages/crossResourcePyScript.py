@@ -10,7 +10,7 @@ with open("gh.token", "r") as f:
 	reader = f.readlines()
 	ghtoken = reader[0]
 
-def main():
+def main(ghtoken):
 	"""
 	Main function for the scraper. Read package list, query Github, write results.
 
@@ -18,10 +18,11 @@ def main():
 	# Read packages list from CSV file
 	packList = read_pkg_csv("Py_packages_toScrape.csv")
 	# Query Github with the package list
-	results = send_query(packList)
+	results = send_query(packList, ghtoken)
 	# Write out the results to a csv file
 	write_csv(results)
 	return
+
 
 def read_pkg_csv(filename):
 	"""
@@ -38,6 +39,7 @@ def read_pkg_csv(filename):
 	    	if package != "package":
 	    		# Append individual package name
 	    		packList.append(package)
+
 	return packList
 
 
@@ -72,7 +74,7 @@ def write_csv(results):
 	return
 
 
-def send_query(packList):
+def send_query(packList, ghtoken):
 
 	"""
 	Make a github query for each package in the package list.
@@ -87,7 +89,7 @@ def send_query(packList):
 		try:
 			# Make the github request. Look for 'import <package_name>' in code in python files
 			r = requests.get('https://api.github.com/search/code?q="import {}"+in:file+language:"python"+extension:"py"'.format(pkg), 
-				headers={"Authorization":"token 73ebf3ec3fa330cabbe6b1bc6facc2a115ee5e68", "Accept": "application/vnd.github.v3+json"})
+				headers={"Authorization":"token {}".format(ghtoken), "Accept": "application/vnd.github.v3+json"})
 
 			# Did the query come back successful?
 			if r.status_code == 200:
@@ -119,4 +121,41 @@ def send_query(packList):
 	return results
 
 
-main()
+main(ghtoken)
+
+
+# def write_multi_connection_csv():
+# 	"""
+# 	Open the CSV file and read in the package list. 
+
+# 	"""
+# 	packList = []
+# 	multi = {}
+# 	output = []
+# 	_headers = ["package", "connections"]
+
+# 	with open("scrapeGitResults.csv") as csvfile:
+# 		# Csv reader
+# 	    reader = csv.DictReader(csvfile, delimiter=",")
+# 	    for row in reader:
+#     		# Append individual package name
+#     		packList.append(row)
+
+# 	for entry in packList:
+# 		if entry["package"] not in multi:
+# 			multi[entry["package"]] = []
+# 		if entry["crossover_package"] not in multi[entry["package"]]:
+# 			multi[entry["package"]].append(entry["crossover_package"])
+
+# 	for k,v in multi.items():
+# 		output.append([k, v])
+
+# 	# Write new (or overwrite) csv file with organized results
+# 	with open("scrapeGitResultsMulti.csv", "w") as csvfile:
+# 		writer = csv.writer(csvfile, delimiter=",")
+# 		writer.writerow(_headers)
+# 		for row in output:
+# 			writer.writerow(row)
+
+# 	return packList
+
