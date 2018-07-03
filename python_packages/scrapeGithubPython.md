@@ -5,7 +5,7 @@ author: Chris Heiser
 ### Overview
 In this case a user has written a script to link a data resource, and the Python package written for that resource, to resources in GitHub.  The intention here is to survey ways in which the data resource is being used in analytic workflows.
 
-We are looking for the statement "import <package_name>" in Python code found on Github. 
+We are looking for the statement ```import package_name``` in Python code found on Github. 
 
 
 
@@ -22,7 +22,7 @@ with open("gh.token", "r") as f:
 
 
 
-The "Py_packages_toScrape.csv" is a single column of python packages names. There isn't a Python equivalent to ROpenSci, so this list was manually created from popular scientific packages. 
+The ```Py_packages_toScrape.csv``` is a single column of python packages names. There isn't a Python equivalent to ROpenSci's package list, so this list was manually created from popular scientific packages. 
 
 
 ```python
@@ -42,7 +42,7 @@ def main(ghtoken):
 
 
 
-We put together the API request and send it out with the authorized token. We use information from the response to write a CSV file with the relevant results. Each line in the "scrapeGitResults.csv" file represents a single connection between two packages, and the URL to the file where the "import <package_name>" was found. 
+We put together the API request and send it out with the authorized token. We use information from the response to write a CSV file with the relevant results. Each line in the ```scrapeGitResults.csv``` file represents a single connection between two packages, and the URL to the file where the ```import package_name``` was found. 
 
 ```python
 def send_query(packList, ghtoken):
