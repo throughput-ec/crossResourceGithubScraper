@@ -2,6 +2,9 @@
 .Rhistory
 .Rapp.history
 
+# PyCharm files
+.idea
+
 # Session Data files
 .RData
 
