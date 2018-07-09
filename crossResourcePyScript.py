@@ -22,9 +22,9 @@ def main(language, packages_filename, ghtoken=""):
         ghtoken = read_gh_token()
 
     # Read packages list from CSV file
-    packlist = read_pkg_csv(os.path.join("data", "import", packages_filename))
+    packlist = read_pkg_csv(os.path.join("data", "input", packages_filename))
     # Query Github with the package list
-    results = send_query(packlist, ghtoken)
+    results = collect_data(packlist, ghtoken)
     # Write out the results to a csv file
     write_csv(results)
     return
@@ -38,9 +38,11 @@ def read_gh_token():
     """
     # If you have your Github token stored in a file, read it in from the file.
     try:
-        with open(os.path.join("data", "import", "gh.token"), "r") as f:
+        print(os.listdir())
+        with open(os.path.join("data", "input", "gh.token"), "r") as f:
             reader = f.readlines()
             ghtoken = reader[0]
+            print(ghtoken)
     except FileNotFoundError:
         print("No Github token provided and no 'gh.token' file was found. Please provide one and try again.")
         sys.exit(0)
@@ -101,7 +103,7 @@ def write_csv(results):
     return
 
 
-def send_query(packlist, ghtoken):
+def collect_data(packlist, ghtoken):
     """
     Make a github query for each package in the package list.
 
@@ -115,44 +117,83 @@ def send_query(packlist, ghtoken):
     # Loop for each package
     for pkg in packlist:
         print("Querying Github: {}".format(pkg))
-        try:
-            # Make the github request. Look for 'import <package_name>' in code in python files
-            r = requests.get(
-                'https://api.github.com/search/code?q="import {}"+in:file+language:"python"+extension:"py"'.format(pkg),
-                headers={"Authorization": "token {}".format(ghtoken), "Accept": "application/vnd.github.v3+json"})
+        # Format the URL to GET
+        next_url ='https://api.github.com/search/code?q="import {}"+in:file+language:"python"+extension:"py"'.format(pkg)
+        # In case there are multiple pages of results, we need to keep requesting the "next" page until all results
+        # are collected
+        while next_url:
+            # Send the query, and organize the results
+            results, next_url = send_query(pkg, next_url, ghtoken, results)
+            # Is there another page of results?
+            if not next_url:
+                # No, we're done querying pages for this package.
+                break
 
-            # Did the query come back successful?
-            if r.status_code == 200:
-                try:
-                    # Load the response json as a Python dictionary
-                    r_text = json.loads(r.text)
-                    # Loop through each query result
-                    for result in r_text["items"]:
-                        try:
-                            # We don't need all the data from the results. Save the few pieces of info that
-                            # we're interested in.
-                            results.append({"package": pkg, "crossover_file": result["html_url"],
-                                            "crossover_package": result["repository"]["name"]})
-                        except KeyError:
-                            # This result was missing a piece of data that we need.
-                            print("Error parsing a result for: {}".format(pkg))
-                except Exception as e:
-                    # There was a problem trying to parse the json response, or 'items' key is not in the response
-                    # results
-                    print("Missing data from Github response object for package: {}".format(pkg))
-            else:
-                # There was a bad HTTP response from Github. If the error is 403,
-                # then we likely hit the rate limiter and need to increase the sleep time between requests.
-                print("Received error from Github API: Status Code: {}".format(r.status_code))
-
-            # Don't query github too fast or you'll hit the limiter and get a bad response. Give it some time.
-            time.sleep(10)
-
-        except Exception as e:
-            # Did your internet connection go out? Something is wrong with sending out the request
-            print("Unable to make Github request. Connection issues.")
-
+    # All done. Return all results.
     return results
+
+
+def send_query(pkg, req_url, ghtoken, results):
+    """
+    Send one request to the Github API. Sort the results into a list of objects, and return them.
+
+    :param str pkg: Current package being queried
+    :param str req_url: URL for the GET request
+    :param str ghtoken: Github Token
+    :param list results: Results (so far)
+    :return list results: Results (with new additions)
+    """
+
+    # Placeholder for the next page url
+    next_url = ""
+    try:
+        # Make the github request. Look for 'import <package_name>' in code in python files
+        r = requests.get(
+            req_url,
+            headers={"Authorization": "token {}".format(ghtoken), "Accept": "application/vnd.github.v3+json"})
+
+        # Did the query come back successful?
+        if r.status_code == 200:
+            try:
+                # Load the response json as a Python dictionary
+                r_text = json.loads(r.text)
+                # Loop through each query result
+                print("Result Items: {}".format(r_text["items"]))
+
+                # Is there another page of results?
+                if r.links["next"]:
+                    # Store the link to the next page
+                    next_url = r.links["next"]["url"]
+
+                # Loop each result in the response
+                for result in r_text["items"]:
+                    try:
+                        # We don't need all the data from the results. Save the few pieces of info that
+                        # we're interested in.
+                        results.append({"package": pkg, "crossover_file": result["html_url"],
+                                        "crossover_package": result["repository"]["name"]})
+                    except KeyError:
+                        # This result was missing a piece of data that we need.
+                        print("Error parsing a result for: {}".format(pkg))
+            except Exception as e:
+                # There was a problem trying to parse the json response, or 'items' key is not in the response
+                # results
+                print("Missing data from Github response object for package: {}".format(pkg))
+        else:
+            # There was a bad HTTP response from Github. If the error is 403,
+            # then we likely hit the rate limiter and need to increase the sleep time between requests.
+            print("Received error from Github API: Status Code: {}".format(r.status_code))
+
+        # Don't query github too fast or you'll hit the limiter and get a bad response. Give it some time.
+        time.sleep(10)
+
+    except Exception as e:
+        # Did your internet connection go out? Something is wrong with sending out the request
+        print("Unable to make Github request. Connection issues.")
+
+    return results, next_url
+
+
 
 
 main("python", "packagesToScrape.csv", ghtoken="")
