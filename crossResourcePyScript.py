@@ -24,7 +24,7 @@ def main(language, packages_filename, ghtoken=""):
     # Read packages list from CSV file
     packlist = read_pkg_csv(os.path.join("data", "input", packages_filename))
     # Query Github with the package list
-    results = collect_data(packlist, ghtoken)
+    results = collect_data(packlist, ghtoken, language)
     # Write out the results to a csv file
     write_csv(results)
     return
@@ -48,6 +48,7 @@ def read_gh_token():
         sys.exit(0)
 
     return ghtoken
+
 
 def read_pkg_csv(filename):
     """
@@ -103,22 +104,33 @@ def write_csv(results):
     return
 
 
-def collect_data(packlist, ghtoken):
+def collect_data(packlist, ghtoken, language):
     """
     Make a github query for each package in the package list.
 
     :param list packlist: Package list
     :param str ghtoken:  Github token
+    :param str language: python or r
     :return list results: Results from Github queries
     """
-
+    next_url = ""
     results = []
 
     # Loop for each package
     for pkg in packlist:
         print("Querying Github: {}".format(pkg))
-        # Format the URL to GET
-        next_url ='https://api.github.com/search/code?q="import {}"+in:file+language:"python"+extension:"py"'.format(pkg)
+        # Format the URL to GET. Query format depends on the language
+        if language.lower() == "r":
+            next_url = 'https://api.github.com/search/code?q="library({})"+in:file+language:"r"+extension:"r"' \
+                       '+extension:"rmd"'.format(pkg)
+        if language.lower() == "python" or language.lower() == "py":
+            next_url = 'https://api.github.com/search/code?q="import {}"+in:file+language:"python"+' \
+                       'extension:"py"'.format(pkg)
+            # TODO Do we also try to query this string for packages listed in multi-import statements too? This is not
+            #  a PEP8 standard, but some people still do multi-imports like this anyways. Rare
+            # next_url = 'https://api.github.com/search/code?q=", {}"+in:file+language:"python"+' \
+            #        'extension:"py"'.format(pkg)
+
         # In case there are multiple pages of results, we need to keep requesting the "next" page until all results
         # are collected
         while next_url:
@@ -192,8 +204,6 @@ def send_query(pkg, req_url, ghtoken, results):
         print("Unable to make Github request. Connection issues.")
 
     return results, next_url
-
-
 
 
 main("python", "packagesToScrape.csv", ghtoken="")
